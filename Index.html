@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Investment Unit Tracker v6</title>
+    <style>
+        :root { --primary: #2563eb; --bg: #f3f4f6; --card: #ffffff; --text: #1f2937; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; display: grid; grid-template-columns: 320px 1fr; gap: 20px; }
+        
+        /* Sidebar */
+        .sidebar { background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); height: fit-content; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; font-size: 0.9em; font-weight: 600; margin-bottom: 5px; color: #4b5563; }
+        input, select { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; font-size: 1em; }
+        
+        /* Client Manager Styles */
+        details { border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; background: #f9fafb; margin-bottom: 20px; }
+        summary { font-weight: 600; color: #4b5563; cursor: pointer; user-select: none; }
+        .client-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #e5e7eb; font-size: 0.9em; }
+        .btn-delete-client { background: none; color: #ef4444; border: none; font-size: 1.2em; cursor: pointer; padding: 0 5px; width: auto; }
+        
+        .checkbox-group { background: #fffbeb; border: 1px solid #fcd34d; padding: 10px; border-radius: 6px; margin-bottom: 15px; }
+        .checkbox-group label { display: flex; align-items: center; gap: 10px; cursor: pointer; color: #92400e; margin: 0; }
+        
+        button { width: 100%; background-color: var(--primary); color: white; border: none; padding: 12px; border-radius: 6px; font-size: 1em; cursor: pointer; font-weight: 600; transition: background 0.2s; }
+        button:hover { background-color: #1d4ed8; }
+        button.secondary { background-color: #ef4444; margin-top: 10px; }
+        button.export { background-color: #10b981; margin-top: 10px; }
+        button.small-btn { padding: 8px; font-size: 0.9em; margin-top: 5px; }
+        
+        input[type="file"] { display: none; }
+        .file-upload-label { display: block; width: 100%; padding: 10px; text-align: center; background: #e0e7ff; color: #4338ca; border: 1px dashed #4338ca; border-radius: 6px; cursor: pointer; margin-top: 10px; font-size: 0.9em; box-sizing: border-box; }
+        
+        /* Main Content */
+        .main { display: flex; flex-direction: column; gap: 20px; }
+        .dashboard { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+        .card { background: var(--card); padding: 20px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .card h3 { margin: 0 0 10px 0; font-size: 0.9em; color: #6b7280; font-weight: 500; }
+        .card .value { font-size: 1.8em; font-weight: 700; color: #111827; }
+        
+        /* Tables */
+        .table-container { background: var(--card); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { padding: 12px 20px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        th { background-color: #f9fafb; font-weight: 600; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em; }
+        .live-input { background: #eff6ff; border: 2px solid #2563eb; font-weight: bold; color: #2563eb; }
+        
+        .text-green { color: #059669; font-weight: bold; }
+        .text-red { color: #dc2626; font-weight: bold; }
+
+        @media (max-width: 768px) { .container { grid-template-columns: 1fr; } .dashboard { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="sidebar">
+        <h2 style="margin-top:0;">📝 Add Transaction</h2>
+        
+        <div class="form-group"><label>Date</label><input type="date" id="t-date"></div>
+        
+        <div class="form-group">
+            <label>Client Name</label>
+            <select id="t-person"></select>
+        </div>
+
+        <details>
+            <summary>⚙️ Manage Clients (Add/Remove)</summary>
+            <div style="margin-top:10px;">
+                <input type="text" id="new-client-input" placeholder="Enter new name..." style="margin-bottom:5px;">
+                <button class="small-btn" onclick="addNewClient()">+ Add Name</button>
+                <div id="client-list-display" style="margin-top:10px; max-height: 150px; overflow-y: auto;"></div>
+            </div>
+        </details>
+
+        <div class="form-group">
+            <label>Type</label>
+            <select id="t-type">
+                <option value="Deposit">Deposit (Inflow)</option>
+                <option value="Withdrawal">Withdrawal (Outflow)</option>
+            </select>
+        </div>
+        <div class="form-group"><label>Cash Amount ($)</label><input type="number" id="t-cash" placeholder="0.00" step="0.01"></div>
+        
+        <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 20px 0;">
+        
+        <div class="checkbox-group">
+            <label><input type="checkbox" id="t-same-price" onchange="toggleNavInput()"><span>Link to previous transaction?</span></label>
+            <p style="font-size:0.75em; margin:5px 0 0 24px; color:#b45309;">Check if multiple people deposited at the same time.</p>
+        </div>
+        <div class="form-group" id="nav-container">
+            <label style="color:#d97706;">⚠️ Portfolio Value BEFORE this Deposit</label>
+            <input type="number" id="t-nav" placeholder="0.00" step="0.01">
+        </div>
+        <button onclick="addTransaction()">Submit Transaction</button>
+        
+        <div style="margin-top: 30px; border-top: 1px solid #e5e7eb; padding-top: 20px;">
+            <h3 style="font-size:0.9em; margin:0 0 10px 0; color:#6b7280;">💾 Data Backup & Restore</h3>
+            <button class="export" onclick="exportData()">⬇ Download CSV</button>
+            <label for="backup-file" class="file-upload-label">📂 Upload CSV to Restore</label>
+            <input type="file" id="backup-file" accept=".csv" onchange="importData(this)">
+            <button class="secondary" onclick="resetData()">⚠ Clear All Data</button>
+        </div>
+    </div>
+
+    <div class="main">
+        <div class="card" style="border: 2px solid #2563eb; background: #f0f9ff;">
+            <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap: wrap;">
+                <div>
+                    <h3 style="color:#1e40af; font-weight:bold;">📈 LIVE VALUATION CHECK</h3>
+                    <p style="margin:0; font-size:0.9em; color:#1e3a8a;">Enter today's total portfolio value:</p>
+                </div>
+                <input type="number" id="live-nav" class="live-input" style="width: 200px; font-size: 1.2em;" oninput="render()" placeholder="Current Total Value">
+            </div>
+        </div>
+
+        <div class="dashboard">
+            <div class="card"><h3>Latest Unit Price</h3><div class="value" id="disp-unit-price">$1.0000</div></div>
+            <div class="card"><h3>Total Units Issued</h3><div class="value" id="disp-total-units">0.0000</div></div>
+            <div class="card"><h3>Implied Portfolio Value</h3><div class="value" id="disp-total-val">$0.00</div></div>
+        </div>
+
+        <div class="table-container">
+            <div style="padding: 20px; border-bottom: 1px solid #e5e7eb;">
+                <h2 style="margin:0;">👥 Client Holdings</h2>
+            </div>
+            <table id="holdings-table">
+                <thead>
+                    <tr>
+                        <th>Client</th>
+                        <th>Units</th>
+                        <th>%</th>
+                        <th style="background:#f3f4f6;">Cost Basis ($)</th>
+                        <th style="background:#f3f4f6;">Avg Price ($)</th>
+                        <th>Current Value ($)</th>
+                        <th>Gain/Loss ($)</th> </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+        </div>
+
+        <div class="table-container">
+            <div style="padding: 20px; border-bottom: 1px solid #e5e7eb;">
+                <h2 style="margin:0;">📜 Transaction History</h2>
+            </div>
+            <div style="overflow-x: auto;">
+                <table id="trans-table">
+                    <thead>
+                        <tr><th>Date</th><th>Person</th><th>Type</th><th>Cash ($)</th><th>NAV Used</th><th>Unit Price</th><th>Units</th><th>Action</th></tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // --- DATA STATE ---
+    let transactions = JSON.parse(localStorage.getItem('unitTrackerData_v2')) || [];
+    let clientList = JSON.parse(localStorage.getItem('unitClients_v1')) || ['You', 'Brother', 'Mom', 'Pheak', 'Puthik'];
+
+    document.getElementById('t-date').valueAsDate = new Date();
+
+    // --- CLIENT MANAGEMENT ---
+    function saveClients() {
+        localStorage.setItem('unitClients_v1', JSON.stringify(clientList));
+        renderClientUI();
+    }
+
+    function renderClientUI() {
+        const select = document.getElementById('t-person');
+        const listDiv = document.getElementById('client-list-display');
+        select.innerHTML = '';
+        listDiv.innerHTML = '';
+
+        clientList.forEach(name => {
+            // Dropdown
+            const option = document.createElement('option');
+            option.value = name;
+            option.innerText = name;
+            select.appendChild(option);
+            
+            // List Manager
+            const div = document.createElement('div');
+            div.className = 'client-item';
+            div.innerHTML = `<span>${name}</span> <button class="btn-delete-client" onclick="removeClient('${name}')">×</button>`;
+            listDiv.appendChild(div);
+        });
+    }
+
+    function addNewClient() {
+        const input = document.getElementById('new-client-input');
+        const name = input.value.trim();
+        if (name && !clientList.includes(name)) {
+            clientList.push(name);
+            saveClients();
+            input.value = '';
+        } else if (clientList.includes(name)) {
+            alert("Client name already exists!");
+        }
+    }
+
+    function removeClient(name) {
+        if (confirm(`Remove "${name}" from the list? (Past transactions are safe)`)) {
+            clientList = clientList.filter(c => c !== name);
+            saveClients();
+        }
+    }
+
+    // --- TRANSACTION LOGIC ---
+    function toggleNavInput() {
+        const isChecked = document.getElementById('t-same-price').checked;
+        const navInput = document.getElementById('t-nav');
+        navInput.disabled = isChecked;
+        navInput.style.backgroundColor = isChecked ? '#e5e7eb' : 'white';
+        if(isChecked) navInput.value = ''; 
+    }
+
+    function save() {
+        localStorage.setItem('unitTrackerData_v2', JSON.stringify(transactions));
+        render();
+    }
+
+    function addTransaction() {
+        const date = document.getElementById('t-date').value;
+        const person = document.getElementById('t-person').value;
+        const type = document.getElementById('t-type').value;
+        const cash = parseFloat(document.getElementById('t-cash').value);
+        const useSamePrice = document.getElementById('t-same-price').checked;
+        let navBefore = parseFloat(document.getElementById('t-nav').value);
+        let unitPrice = 1.0;
+
+        if (!person) { alert("Please select a client."); return; }
+        if (isNaN(cash)) { alert("Please enter cash amount."); return; }
+        
+        if (useSamePrice) {
+            if (transactions.length === 0) { alert("Cannot use 'Same Price' for first transaction!"); return; }
+            unitPrice = transactions[transactions.length - 1].unitPrice;
+            navBefore = transactions[transactions.length - 1].navBefore; 
+        } else {
+            if (isNaN(navBefore)) { alert("Please enter Portfolio Value."); return; }
+            const currentTotalUnits = transactions.reduce((sum, t) => sum + t.units, 0);
+            unitPrice = currentTotalUnits > 0 ? navBefore / currentTotalUnits : 1.0;
+        }
+
+        let unitsIssued = cash / unitPrice;
+        if (type === 'Withdrawal') unitsIssued = -unitsIssued;
+
+        transactions.push({
+            id: Date.now(),
+            date, person, type,
+            cash: type === 'Withdrawal' ? -cash : cash,
+            navBefore: useSamePrice ? "(Linked)" : navBefore,
+            unitPrice, units: unitsIssued
+        });
+        save();
+        document.getElementById('t-cash').value = '';
+        document.getElementById('t-nav').value = '';
+        document.getElementById('t-same-price').checked = false;
+        toggleNavInput();
+    }
+
+    function deleteTransaction(id) { if(confirm("Delete this?")) { transactions = transactions.filter(t => t.id !== id); save(); } }
+    
+    function resetData() { 
+        if(confirm("Delete ALL data?")) { 
+            localStorage.removeItem('unitTrackerData_v2'); 
+            transactions = []; 
+            render(); 
+        } 
+    }
+
+    function exportData() {
+        let csv = "Date,Person,Type,Cash,NAV_Used,Unit_Price,Units\n";
+        transactions.forEach(t => csv += `${t.date},${t.person},${t.type},${t.cash},${t.navBefore},${t.unitPrice},${t.units}\n`);
+        const link = document.createElement("a");
+        link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8;' }));
+        link.download = "investment_backup.csv";
+        link.click();
+    }
+
+    function importData(input) {
+        if(!input.files[0]) return;
+        if(!confirm("Overwrite current data?")) { input.value = ''; return; }
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const rows = e.target.result.split('\n').filter(r => r.trim() !== '');
+            const newTrans = [];
+            let isHeader = true;
+            try {
+                rows.forEach((row, i) => {
+                    if (isHeader) { isHeader = false; return; }
+                    const c = row.split(',');
+                    if (c.length < 6) return;
+                    newTrans.push({
+                        id: Date.now() + i, date: c[0], person: c[1], type: c[2],
+                        cash: parseFloat(c[3]), navBefore: isNaN(parseFloat(c[4])) ? "(Linked)" : parseFloat(c[4]),
+                        unitPrice: parseFloat(c[5]), units: parseFloat(c[6])
+                    });
+                });
+                if(newTrans.length > 0) { transactions = newTrans; save(); alert(`Restored ${newTrans.length} transactions.`); }
+            } catch (err) { alert("Error parsing CSV."); }
+            input.value = '';
+        };
+        reader.readAsText(input.files[0]);
+    }
+
+    // --- MAIN RENDER LOOP ---
+    function render() {
+        const holdingsBody = document.querySelector('#holdings-table tbody');
+        const transBody = document.querySelector('#trans-table tbody');
+        holdingsBody.innerHTML = '';
+        transBody.innerHTML = '';
+
+        const people = {}; 
+        let totalUnits = 0;
+
+        transactions.forEach(t => {
+            if (!people[t.person]) people[t.person] = { units: 0, costBasis: 0 };
+            people[t.person].units += t.units;
+            people[t.person].costBasis += t.cash; 
+            totalUnits += t.units;
+        });
+
+        let liveVal = parseFloat(document.getElementById('live-nav').value);
+        const lastTrans = transactions[transactions.length-1];
+        if (isNaN(liveVal)) liveVal = lastTrans ? totalUnits * lastTrans.unitPrice : 0;
+        
+        const currentUnitPrice = totalUnits > 0 ? (liveVal / totalUnits) : 1.0;
+
+        document.getElementById('disp-unit-price').innerText = `$${currentUnitPrice.toFixed(4)}`;
+        document.getElementById('disp-total-units').innerText = totalUnits.toFixed(4);
+        document.getElementById('disp-total-val').innerText = `$${liveVal.toFixed(2)}`;
+
+        Object.keys(people).forEach(person => {
+            const data = people[person];
+            const currentVal = data.units * currentUnitPrice;
+            const percent = totalUnits > 0 ? (data.units / totalUnits * 100) : 0;
+            
+            // Calculate Avg Price
+            let avgPriceStr = "$0.0000";
+            if (data.units > 0) {
+                if (data.costBasis <= 0) avgPriceStr = "<span class='text-green'>Free (Profit)</span>";
+                else avgPriceStr = `$${(data.costBasis / data.units).toFixed(4)}`;
+            }
+
+            // Calculate Gain/Loss
+            const gain = currentVal - data.costBasis;
+            const gainPercent = (data.costBasis > 0) ? (gain / data.costBasis * 100) : 0;
+            
+            // Format Gain String
+            let gainClass = gain >= 0 ? 'text-green' : 'text-red';
+            let gainStr = `$${gain.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            
+            // Special case for negative cost basis (House Money)
+            if (data.costBasis <= 0 && data.units > 0) {
+                gainClass = 'text-green';
+                gainStr = `+$${currentVal.toLocaleString(undefined, {minimumFractionDigits: 2})} (Realized: $${Math.abs(data.costBasis).toFixed(0)})`;
+            } else if (data.costBasis > 0) {
+                gainStr += ` <span style="font-size:0.8em; opacity:0.8;">(${gainPercent > 0 ? '+' : ''}${gainPercent.toFixed(2)}%)</span>`;
+            }
+
+            holdingsBody.innerHTML += `<tr>
+                <td><strong>${person}</strong></td>
+                <td>${data.units.toFixed(4)}</td>
+                <td>${percent.toFixed(2)}%</td>
+                <td style="color:#4b5563;">$${data.costBasis.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td>${avgPriceStr}</td>
+                <td style="font-weight:bold;">$${currentVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td class="${gainClass}">${gainStr}</td>
+            </tr>`;
+        });
+
+        [...transactions].reverse().forEach(t => {
+            transBody.innerHTML += `<tr>
+                <td>${t.date}</td>
+                <td>${t.person}</td>
+                <td><span style="padding:4px 8px; border-radius:4px; font-size:0.8em; background:${t.type === 'Deposit' ? '#d1fae5' : '#fee2e2'}; color:${t.type === 'Deposit' ? '#065f46' : '#991b1b'};">${t.type}</span></td>
+                <td>$${Math.abs(t.cash).toFixed(2)}</td>
+                <td>${t.navBefore}</td>
+                <td>$${t.unitPrice.toFixed(4)}</td>
+                <td>${t.units.toFixed(4)}</td>
+                <td><button onclick="deleteTransaction(${t.id})" style="background:none; color:red; padding:0; width:auto; text-decoration:underline; font-size:0.8em;">Delete</button></td>
+            </tr>`;
+        });
+    }
+
+    renderClientUI();
+    render();
+</script>
+</body>
+</html>
