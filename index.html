@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Investment Unit Tracker v6</title>
+    <title>Investment Unit Tracker v7 (With Lots)</title>
     <style>
         :root { --primary: #2563eb; --bg: #f3f4f6; --card: #ffffff; --text: #1f2937; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
@@ -16,8 +16,13 @@
         input, select { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; font-size: 1em; }
         
         /* Client Manager Styles */
-        details { border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; background: #f9fafb; margin-bottom: 20px; }
-        summary { font-weight: 600; color: #4b5563; cursor: pointer; user-select: none; }
+        details { margin-bottom: 10px; }
+        summary { cursor: pointer; user-select: none; outline: none; }
+        
+        /* Sidebar specific details */
+        .sidebar details { border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; background: #f9fafb; margin-bottom: 20px; }
+        .sidebar summary { font-weight: 600; color: #4b5563; }
+
         .client-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #e5e7eb; font-size: 0.9em; }
         .btn-delete-client { background: none; color: #ef4444; border: none; font-size: 1.2em; cursor: pointer; padding: 0 5px; width: auto; }
         
@@ -43,12 +48,20 @@
         /* Tables */
         .table-container { background: var(--card); border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); overflow: hidden; }
         table { width: 100%; border-collapse: collapse; }
-        th, td { padding: 12px 20px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        th, td { padding: 12px 20px; text-align: left; border-bottom: 1px solid #e5e7eb; vertical-align: top; }
         th { background-color: #f9fafb; font-weight: 600; font-size: 0.85em; text-transform: uppercase; letter-spacing: 0.05em; }
         .live-input { background: #eff6ff; border: 2px solid #2563eb; font-weight: bold; color: #2563eb; }
         
         .text-green { color: #059669; font-weight: bold; }
         .text-red { color: #dc2626; font-weight: bold; }
+
+        /* Lot History Styles */
+        .lot-summary { color: var(--primary); font-weight: bold; }
+        .lot-container { background: #f8fafc; padding: 10px; margin-top: 5px; border-radius: 6px; border-left: 3px solid #94a3b8; font-size: 0.85em; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05); }
+        .lot-item { display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding: 4px 0; }
+        .lot-item:last-child { border-bottom: none; }
+        .lot-date { color: #64748b; }
+        .lot-detail { color: #334155; font-family: monospace; }
 
         @media (max-width: 768px) { .container { grid-template-columns: 1fr; } .dashboard { grid-template-columns: 1fr; } }
     </style>
@@ -129,13 +142,14 @@
             <table id="holdings-table">
                 <thead>
                     <tr>
-                        <th>Client</th>
+                        <th style="width: 250px;">Client (Click to see lots)</th>
                         <th>Units</th>
                         <th>%</th>
                         <th style="background:#f3f4f6;">Cost Basis ($)</th>
                         <th style="background:#f3f4f6;">Avg Price ($)</th>
                         <th>Current Value ($)</th>
-                        <th>Gain/Loss ($)</th> </tr>
+                        <th>Gain/Loss ($)</th> 
+                    </tr>
                 </thead>
                 <tbody></tbody>
             </table>
@@ -318,10 +332,24 @@
         const people = {}; 
         let totalUnits = 0;
 
+        // Process Lots & Totals
         transactions.forEach(t => {
-            if (!people[t.person]) people[t.person] = { units: 0, costBasis: 0 };
+            if (!people[t.person]) {
+                people[t.person] = { units: 0, costBasis: 0, lots: [] };
+            }
             people[t.person].units += t.units;
-            people[t.person].costBasis += t.cash; 
+            people[t.person].costBasis += t.cash;
+            
+            // Store individual deposits as "lots"
+            if (t.type === 'Deposit') {
+                people[t.person].lots.push({
+                    date: t.date,
+                    units: t.units,
+                    price: t.unitPrice,
+                    amount: t.cash
+                });
+            }
+            
             totalUnits += t.units;
         });
 
@@ -363,8 +391,27 @@
                 gainStr += ` <span style="font-size:0.8em; opacity:0.8;">(${gainPercent > 0 ? '+' : ''}${gainPercent.toFixed(2)}%)</span>`;
             }
 
+            // --- BUILD ROW WITH LOTS ---
+            // Only show details if they have lots
+            let personCellHTML = `<span style="font-weight:bold;">${person}</span>`;
+            
+            if(data.lots.length > 0) {
+                personCellHTML = `
+                <details>
+                    <summary class="lot-summary">${person}</summary>
+                    <div class="lot-container">
+                        ${data.lots.map(lot => `
+                            <div class="lot-item">
+                                <span class="lot-date">${lot.date}</span>
+                                <span class="lot-detail">${lot.units.toFixed(2)} u @ $${lot.price.toFixed(4)}</span>
+                            </div>
+                        `).join('')}
+                    </div>
+                </details>`;
+            }
+
             holdingsBody.innerHTML += `<tr>
-                <td><strong>${person}</strong></td>
+                <td>${personCellHTML}</td>
                 <td>${data.units.toFixed(4)}</td>
                 <td>${percent.toFixed(2)}%</td>
                 <td style="color:#4b5563;">$${data.costBasis.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
