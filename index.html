@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Investment Unit Tracker v7 (With Lots)</title>
+    <title>Investment Unit Tracker v9 (With Percentages)</title>
     <style>
         :root { --primary: #2563eb; --bg: #f3f4f6; --card: #ffffff; --text: #1f2937; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: var(--bg); color: var(--text); margin: 0; padding: 20px; }
@@ -16,13 +16,8 @@
         input, select { width: 100%; padding: 10px; border: 1px solid #d1d5db; border-radius: 6px; box-sizing: border-box; font-size: 1em; }
         
         /* Client Manager Styles */
-        details { margin-bottom: 10px; }
-        summary { cursor: pointer; user-select: none; outline: none; }
-        
-        /* Sidebar specific details */
         .sidebar details { border: 1px solid #e5e7eb; border-radius: 6px; padding: 10px; background: #f9fafb; margin-bottom: 20px; }
-        .sidebar summary { font-weight: 600; color: #4b5563; }
-
+        .sidebar summary { font-weight: 600; color: #4b5563; cursor: pointer; }
         .client-item { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; border-bottom: 1px solid #e5e7eb; font-size: 0.9em; }
         .btn-delete-client { background: none; color: #ef4444; border: none; font-size: 1.2em; cursor: pointer; padding: 0 5px; width: auto; }
         
@@ -55,13 +50,79 @@
         .text-green { color: #059669; font-weight: bold; }
         .text-red { color: #dc2626; font-weight: bold; }
 
-        /* Lot History Styles */
-        .lot-summary { color: var(--primary); font-weight: bold; }
-        .lot-container { background: #f8fafc; padding: 10px; margin-top: 5px; border-radius: 6px; border-left: 3px solid #94a3b8; font-size: 0.85em; box-shadow: inset 0 1px 3px rgba(0,0,0,0.05); }
-        .lot-item { display: flex; justify-content: space-between; border-bottom: 1px dashed #e2e8f0; padding: 4px 0; }
-        .lot-item:last-child { border-bottom: none; }
-        .lot-date { color: #64748b; }
-        .lot-detail { color: #334155; font-family: monospace; }
+        /* --- PRO LOT TABLE STYLES --- */
+        details { width: 100%; }
+        summary { outline: none; list-style: none; }
+        summary::-webkit-details-marker { display: none; } 
+        
+        .client-header-flex { display: flex; align-items: center; cursor: pointer; gap: 8px; }
+        .chevron { transition: transform 0.2s; font-size: 0.8em; color: #94a3b8; }
+        details[open] .chevron { transform: rotate(90deg); }
+
+        .lot-wrapper {
+            margin-top: 12px;
+            padding: 10px;
+            background-color: #f1f5f9;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            box-shadow: inset 0 2px 4px rgba(0,0,0,0.03);
+            overflow-x: auto;
+        }
+
+        .lot-table {
+            width: 100%;
+            border-collapse: separate;
+            border-spacing: 0 6px;
+            font-size: 0.85em;
+        }
+
+        .lot-table th {
+            text-align: right;
+            color: #64748b;
+            font-weight: 600;
+            padding: 0 10px 5px 10px;
+            border-bottom: 1px solid #cbd5e1;
+            font-size: 0.8em;
+            background: transparent;
+            text-transform: none;
+        }
+
+        .lot-table th:first-child { text-align: left; }
+
+        .lot-table td {
+            background-color: white;
+            border: 1px solid #e2e8f0;
+            border-width: 1px 0 1px 0;
+            padding: 8px 10px;
+            text-align: right;
+            color: #334155;
+            vertical-align: middle;
+        }
+
+        .lot-table td:first-child { 
+            border-left: 1px solid #e2e8f0; 
+            border-top-left-radius: 6px; 
+            border-bottom-left-radius: 6px;
+            text-align: left;
+            color: #475569;
+        }
+        .lot-table td:last-child { 
+            border-right: 1px solid #e2e8f0; 
+            border-top-right-radius: 6px; 
+            border-bottom-right-radius: 6px; 
+        }
+
+        .pseudo-input {
+            display: inline-block;
+            padding: 4px 8px;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            background: #fff;
+            color: #1e293b;
+            min-width: 60px;
+            text-align: center;
+            font-family: monospace;
+        }
 
         @media (max-width: 768px) { .container { grid-template-columns: 1fr; } .dashboard { grid-template-columns: 1fr; } }
     </style>
@@ -79,7 +140,7 @@
             <select id="t-person"></select>
         </div>
 
-        <details>
+        <details class="sidebar-details">
             <summary>⚙️ Manage Clients (Add/Remove)</summary>
             <div style="margin-top:10px;">
                 <input type="text" id="new-client-input" placeholder="Enter new name..." style="margin-bottom:5px;">
@@ -142,13 +203,13 @@
             <table id="holdings-table">
                 <thead>
                     <tr>
-                        <th style="width: 250px;">Client (Click to see lots)</th>
+                        <th style="width: 300px;">Client</th>
                         <th>Units</th>
                         <th>%</th>
                         <th style="background:#f3f4f6;">Cost Basis ($)</th>
                         <th style="background:#f3f4f6;">Avg Price ($)</th>
                         <th>Current Value ($)</th>
-                        <th>Gain/Loss ($)</th> 
+                        <th>Gain/Loss ($/%)</th> 
                     </tr>
                 </thead>
                 <tbody></tbody>
@@ -191,13 +252,11 @@
         listDiv.innerHTML = '';
 
         clientList.forEach(name => {
-            // Dropdown
             const option = document.createElement('option');
             option.value = name;
             option.innerText = name;
             select.appendChild(option);
             
-            // List Manager
             const div = document.createElement('div');
             div.className = 'client-item';
             div.innerHTML = `<span>${name}</span> <button class="btn-delete-client" onclick="removeClient('${name}')">×</button>`;
@@ -332,7 +391,7 @@
         const people = {}; 
         let totalUnits = 0;
 
-        // Process Lots & Totals
+        // 1. Process Lots & Totals
         transactions.forEach(t => {
             if (!people[t.person]) {
                 people[t.person] = { units: 0, costBasis: 0, lots: [] };
@@ -340,7 +399,6 @@
             people[t.person].units += t.units;
             people[t.person].costBasis += t.cash;
             
-            // Store individual deposits as "lots"
             if (t.type === 'Deposit') {
                 people[t.person].lots.push({
                     date: t.date,
@@ -353,6 +411,7 @@
             totalUnits += t.units;
         });
 
+        // 2. Calculate Global Prices
         let liveVal = parseFloat(document.getElementById('live-nav').value);
         const lastTrans = transactions[transactions.length-1];
         if (isNaN(liveVal)) liveVal = lastTrans ? totalUnits * lastTrans.unitPrice : 0;
@@ -363,64 +422,102 @@
         document.getElementById('disp-total-units').innerText = totalUnits.toFixed(4);
         document.getElementById('disp-total-val').innerText = `$${liveVal.toFixed(2)}`;
 
+        // 3. Render Holdings Table
         Object.keys(people).forEach(person => {
             const data = people[person];
             const currentVal = data.units * currentUnitPrice;
             const percent = totalUnits > 0 ? (data.units / totalUnits * 100) : 0;
             
-            // Calculate Avg Price
+            // Avg Price
             let avgPriceStr = "$0.0000";
             if (data.units > 0) {
                 if (data.costBasis <= 0) avgPriceStr = "<span class='text-green'>Free (Profit)</span>";
                 else avgPriceStr = `$${(data.costBasis / data.units).toFixed(4)}`;
             }
 
-            // Calculate Gain/Loss
+            // --- GAIN / LOSS CALCULATION WITH PERCENTAGE ---
             const gain = currentVal - data.costBasis;
-            const gainPercent = (data.costBasis > 0) ? (gain / data.costBasis * 100) : 0;
+            const gainClass = gain >= 0 ? 'text-green' : 'text-red';
             
-            // Format Gain String
-            let gainClass = gain >= 0 ? 'text-green' : 'text-red';
             let gainStr = `$${gain.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
             
-            // Special case for negative cost basis (House Money)
-            if (data.costBasis <= 0 && data.units > 0) {
-                gainClass = 'text-green';
-                gainStr = `+$${currentVal.toLocaleString(undefined, {minimumFractionDigits: 2})} (Realized: $${Math.abs(data.costBasis).toFixed(0)})`;
-            } else if (data.costBasis > 0) {
-                gainStr += ` <span style="font-size:0.8em; opacity:0.8;">(${gainPercent > 0 ? '+' : ''}${gainPercent.toFixed(2)}%)</span>`;
+            // Percentage Logic
+            if (data.costBasis > 0) {
+                const gainPercent = (gain / data.costBasis * 100);
+                const sign = gain >= 0 ? '+' : '';
+                // Append the percentage in smaller text
+                gainStr += ` <span style="font-size:0.85em; opacity:0.8;">(${sign}${gainPercent.toFixed(2)}%)</span>`;
+            } else if (data.costBasis <= 0 && data.units > 0) {
+                // Special case for house money (infinite return)
+                gainStr = `+$${currentVal.toLocaleString(undefined, {minimumFractionDigits: 2})} <span style="font-size:0.8em;">(Free)</span>`;
             }
 
-            // --- BUILD ROW WITH LOTS ---
-            // Only show details if they have lots
-            let personCellHTML = `<span style="font-weight:bold;">${person}</span>`;
+            // --- BUILD LOT TABLE ---
+            let personCellHTML = `<span style="font-weight:bold; font-size:1.1em; color:#1e293b;">${person}</span>`;
             
             if(data.lots.length > 0) {
+                const sortedLots = data.lots.sort((a,b) => new Date(b.date) - new Date(a.date));
+                
+                let lotRows = sortedLots.map(lot => {
+                    const lotMktValue = lot.units * currentUnitPrice;
+                    const lotGain = lotMktValue - lot.amount;
+                    const lotGainPercent = (lot.amount > 0) ? (lotGain / lot.amount * 100) : 0;
+                    
+                    const lotColor = lotGain >= 0 ? 'text-green' : 'text-red';
+                    const sign = lotGain >= 0 ? '+' : '';
+
+                    return `
+                    <tr>
+                        <td><span class="pseudo-input">${lot.date}</span></td>
+                        <td><span class="pseudo-input">${lot.units.toFixed(2)}</span></td>
+                        <td><span class="pseudo-input">$${lot.price.toFixed(4)}</span></td>
+                        <td style="color:#64748b;">$${lot.amount.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                        <td style="font-weight:600;">$${lotMktValue.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                        <td class="${lotColor}">${sign}${lotGainPercent.toFixed(2)}%</td>
+                        <td class="${lotColor}">${sign}$${lotGain.toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    </tr>`;
+                }).join('');
+
                 personCellHTML = `
                 <details>
-                    <summary class="lot-summary">${person}</summary>
-                    <div class="lot-container">
-                        ${data.lots.map(lot => `
-                            <div class="lot-item">
-                                <span class="lot-date">${lot.date}</span>
-                                <span class="lot-detail">${lot.units.toFixed(2)} u @ $${lot.price.toFixed(4)}</span>
-                            </div>
-                        `).join('')}
+                    <summary class="client-header-flex">
+                        <span class="chevron">▶</span>
+                        <span style="font-weight:bold; font-size:1.1em; color:#1e293b;">${person}</span>
+                        <span style="font-size:0.8em; color:#64748b; background:#e2e8f0; padding:2px 6px; border-radius:10px;">${data.lots.length} Lots</span>
+                    </summary>
+                    <div class="lot-wrapper">
+                        <table class="lot-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Shares</th>
+                                    <th>Cost/Share</th>
+                                    <th>Total Cost</th>
+                                    <th>Mkt Value</th>
+                                    <th>Tot Gain %</th>
+                                    <th>Tot Gain $</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${lotRows}
+                            </tbody>
+                        </table>
                     </div>
                 </details>`;
             }
 
             holdingsBody.innerHTML += `<tr>
-                <td>${personCellHTML}</td>
-                <td>${data.units.toFixed(4)}</td>
-                <td>${percent.toFixed(2)}%</td>
-                <td style="color:#4b5563;">$${data.costBasis.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td>${avgPriceStr}</td>
-                <td style="font-weight:bold;">$${currentVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
-                <td class="${gainClass}">${gainStr}</td>
+                <td style="padding:10px;">${personCellHTML}</td>
+                <td style="vertical-align:top; padding-top:20px;">${data.units.toFixed(4)}</td>
+                <td style="vertical-align:top; padding-top:20px;">${percent.toFixed(2)}%</td>
+                <td style="vertical-align:top; padding-top:20px; color:#4b5563;">$${data.costBasis.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td style="vertical-align:top; padding-top:20px;">${avgPriceStr}</td>
+                <td style="vertical-align:top; padding-top:20px; font-weight:bold;">$${currentVal.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</td>
+                <td style="vertical-align:top; padding-top:20px;" class="${gainClass}">${gainStr}</td>
             </tr>`;
         });
 
+        // 4. Render History
         [...transactions].reverse().forEach(t => {
             transBody.innerHTML += `<tr>
                 <td>${t.date}</td>
